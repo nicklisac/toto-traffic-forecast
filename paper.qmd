@@ -533,6 +533,6 @@ print(refs)
 
 ---
 
-*Code and data available at: [GitHub repository]*
+*Code and data available at: https://github.com/nicklisac/toto-traffic-forecast*
 
 *This research used computational resources totaling ~5 minutes of GPU time (RTX 3090, 24GB VRAM) and ~10 minutes of CPU time for classical models.*
