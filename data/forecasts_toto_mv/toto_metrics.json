@@ -1,0 +1,11 @@
+{
+  "model": "Datadog/Toto-2.0-2.5B",
+  "device": "cuda",
+  "context_hours": 8704,
+  "horizon_hours": 160,
+  "n_windows": 158,
+  "mean_mae": 58.68414342735387,
+  "mean_mape": 22.934102730283673,
+  "mean_inference_time": 0.7159045436714269,
+  "total_inference_time": 113.11291790008545
+}

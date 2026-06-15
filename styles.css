@@ -1,0 +1,13 @@
+/* Make all images and figures fit within content width */
+main img,
+main .figure-img,
+main .img-fluid {
+  max-width: 100% !important;
+  height: auto !important;
+}
+
+/* Same for cell outputs */
+div.cell-output-display img {
+  max-width: 100% !important;
+  height: auto !important;
+}
