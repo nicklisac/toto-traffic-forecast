@@ -136,8 +136,8 @@ If Toto can compete here, it would generalize to nearly any periodic time series
 
 ### Prerequisites
 
-- **R 4.6+** with packages: `forecast`, `data.table`
-- **Python 3.12+** with packages: `toto-models`, `pandas`, `numpy`, `torch` (CPU), `matplotlib`
+- **R 4.6+** with packages: `forecast`, `data.table`, `ggplot2`, `jsonlite`, `lubridate`, `reticulate`, `patchwork`
+- **Python 3.12+** with packages: `toto-models`, `pandas`, `numpy`, `torch` (CPU)
 - The Python environment for Toto is separate from the scraping environment
 
 ### File Structure
@@ -145,10 +145,13 @@ If Toto can compete here, it would generalize to nearly any periodic time series
 ```
 time-seRies/
 ├── scrape_traffic.py      # Data collection (Playwright, async)
-├── prepare_data.py        # Train/test split, R series, Toto contexts
+├── prepare_data.R         # Train/test split, R series, Toto contexts (uses reticulate for npz)
 ├── forecast_r.R           # SARIMA, TBATS, Naive forecasts
+├── forecast_r_horizon.R   # R model forecasts at different horizons
 ├── forecast_toto.py       # Toto-2.0-2.5B CPU inference
-├── evaluate.py            # Metrics, plots, comparison
+├── evaluate.R             # Metrics, plots, comparison (ggplot2)
+├── analyze_horizon.R      # Horizon stress-test analysis & comparison plotting (ggplot2)
+├── paper.qmd              # Quarto research paper (uses native R chunks)
 ├── data/
 │   ├── hourly_counts.csv  # Raw scraped data (396K rows)
 │   ├── train.csv          # Training split
@@ -168,7 +171,7 @@ time-seRies/
 python scrape_traffic.py
 
 # 2. Prepare data
-python prepare_data.py
+Rscript prepare_data.R
 
 # 3. Run R forecasts (~5-10 min)
 Rscript forecast_r.R all
@@ -177,7 +180,10 @@ Rscript forecast_r.R all
 python forecast_toto.py
 
 # 5. Evaluate and plot
-python evaluate.py
+Rscript evaluate.R
+
+# 6. Run horizon analysis and stress-test plots
+Rscript analyze_horizon.R
 ```
 
 ---

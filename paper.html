@@ -106,6 +106,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <li><a href="#sarima" id="toc-sarima" class="nav-link" data-scroll-target="#sarima"><span class="header-section-number">3.2.1</span> SARIMA</a></li>
   <li><a href="#mstl-arima" id="toc-mstl-arima" class="nav-link" data-scroll-target="#mstl-arima"><span class="header-section-number">3.2.2</span> MSTL + ARIMA</a></li>
   <li><a href="#seasonal-naive" id="toc-seasonal-naive" class="nav-link" data-scroll-target="#seasonal-naive"><span class="header-section-number">3.2.3</span> Seasonal Naive</a></li>
+  <li><a href="#r-implementation-example" id="toc-r-implementation-example" class="nav-link" data-scroll-target="#r-implementation-example"><span class="header-section-number">3.2.4</span> R Implementation Example</a></li>
   </ul></li>
   <li><a href="#toto-2.0-2.5b" id="toc-toto-2.0-2.5b" class="nav-link" data-scroll-target="#toto-2.0-2.5b"><span class="header-section-number">3.3</span> Toto-2.0-2.5B</a></li>
   </ul></li>
@@ -221,84 +222,43 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="traintest-split" class="level2" data-number="2.2">
 <h2 data-number="2.2" class="anchored" data-anchor-id="traintest-split"><span class="header-section-number">2.2</span> Train/Test Split</h2>
-<div id="6376e7af" class="cell" data-execution_count="2">
-<div class="cell-output cell-output-stdout">
-<pre><code>| Split   | Period                  |   Hours |   Days |
-|:--------|:------------------------|--------:|-------:|
-| Train   | 2020-01-01 → 2025-12-31 |   52608 |   2192 |
-| Test    | 2026-01-01 → 2026-06-13 |    3936 |    164 |</code></pre>
+<div class="cell">
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<thead>
+<tr class="header">
+<th style="text-align: left;">Split</th>
+<th style="text-align: left;">Period</th>
+<th style="text-align: right;">Hours</th>
+<th style="text-align: right;">Days</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Train</td>
+<td style="text-align: left;">2020-01-01 → 2025-12-31</td>
+<td style="text-align: right;">52608</td>
+<td style="text-align: right;">2192</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Test</td>
+<td style="text-align: left;">2026-01-01 → 2026-06-13</td>
+<td style="text-align: right;">3936</td>
+<td style="text-align: right;">164</td>
+</tr>
+</tbody>
+</table>
 </div>
 </div>
 <p>The train/test split respects temporal ordering—no look-ahead bias. The test period captures seasonal transition (winter to summer), providing a challenging evaluation setting.</p>
 </section>
 <section id="data-characteristics" class="level2" data-number="2.3">
 <h2 data-number="2.3" class="anchored" data-anchor-id="data-characteristics"><span class="header-section-number">2.3</span> Data Characteristics</h2>
-<div id="cell-data-stats" class="cell" data-execution_count="3">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.pyplot <span class="im">as</span> plt</span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.dates <span class="im">as</span> mdates</span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Load full hourly data for analysis</span></span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>full_data <span class="op">=</span> pd.read_csv(</span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>    <span class="st">"data/series/r_hourly_full_all_directions.csv"</span></span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>full_data[<span class="st">"datetime"</span>] <span class="op">=</span> pd.to_datetime(</span>
-<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>    full_data[<span class="st">"datetime"</span>], utc<span class="op">=</span><span class="va">True</span></span>
-<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a><span class="co"># Split train/test</span></span>
-<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>train_mask <span class="op">=</span> full_data[<span class="st">"datetime"</span>] <span class="op">&lt;=</span> <span class="st">"2025-12-31 23:59:59"</span></span>
-<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>test_mask <span class="op">=</span> full_data[<span class="st">"datetime"</span>] <span class="op">&gt;=</span> <span class="st">"2026-01-01"</span></span>
-<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>fig, axes <span class="op">=</span> plt.subplots(<span class="dv">3</span>, <span class="dv">1</span>, figsize<span class="op">=</span>(<span class="dv">10</span>, <span class="dv">8</span>))</span>
-<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a><span class="co"># Panel A: Full series</span></span>
-<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">0</span>].plot(</span>
-<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a>    full_data[<span class="st">"datetime"</span>], full_data[<span class="st">"value"</span>],</span>
-<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a>    linewidth<span class="op">=</span><span class="fl">0.3</span>, alpha<span class="op">=</span><span class="fl">0.7</span>, color<span class="op">=</span><span class="st">"#2563eb"</span></span>
-<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">0</span>].axvline(</span>
-<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a>    pd.Timestamp(<span class="st">"2026-01-01"</span>, tz<span class="op">=</span><span class="st">"UTC"</span>),</span>
-<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a>    color<span class="op">=</span><span class="st">"red"</span>, linestyle<span class="op">=</span><span class="st">"--"</span>, alpha<span class="op">=</span><span class="fl">0.5</span>,</span>
-<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a>    label<span class="op">=</span><span class="st">"Test start"</span></span>
-<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">0</span>].set_ylabel(<span class="st">"Vehicles/hour"</span>)</span>
-<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">0</span>].set_title(<span class="st">"Full 6.5-year series"</span>)</span>
-<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">0</span>].legend(fontsize<span class="op">=</span><span class="dv">8</span>)</span>
-<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">0</span>].grid(alpha<span class="op">=</span><span class="fl">0.3</span>)</span>
-<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a><span class="co"># Panel B: Test period zoom</span></span>
-<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">1</span>].plot(</span>
-<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a>    full_data.loc[test_mask, <span class="st">"datetime"</span>],</span>
-<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a>    full_data.loc[test_mask, <span class="st">"value"</span>],</span>
-<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a>    linewidth<span class="op">=</span><span class="fl">0.8</span>, color<span class="op">=</span><span class="st">"#dc2626"</span></span>
-<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">1</span>].set_ylabel(<span class="st">"Vehicles/hour"</span>)</span>
-<span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">1</span>].set_title(<span class="st">"Test period (2026)"</span>)</span>
-<span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">1</span>].grid(alpha<span class="op">=</span><span class="fl">0.3</span>)</span>
-<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a><span class="co"># Panel C: Hour-of-day pattern (train average)</span></span>
-<span id="cb2-44"><a href="#cb2-44" aria-hidden="true" tabindex="-1"></a>hourly_pattern <span class="op">=</span> full_data.loc[train_mask].copy()</span>
-<span id="cb2-45"><a href="#cb2-45" aria-hidden="true" tabindex="-1"></a>hourly_pattern[<span class="st">"hour"</span>] <span class="op">=</span> hourly_pattern[<span class="st">"datetime"</span>].dt.hour</span>
-<span id="cb2-46"><a href="#cb2-46" aria-hidden="true" tabindex="-1"></a>avg_by_hour <span class="op">=</span> hourly_pattern.groupby(<span class="st">"hour"</span>)[<span class="st">"value"</span>].mean()</span>
-<span id="cb2-47"><a href="#cb2-47" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">2</span>].bar(</span>
-<span id="cb2-48"><a href="#cb2-48" aria-hidden="true" tabindex="-1"></a>    avg_by_hour.index, avg_by_hour.values,</span>
-<span id="cb2-49"><a href="#cb2-49" aria-hidden="true" tabindex="-1"></a>    color<span class="op">=</span><span class="st">"#2563eb"</span>, alpha<span class="op">=</span><span class="fl">0.8</span></span>
-<span id="cb2-50"><a href="#cb2-50" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb2-51"><a href="#cb2-51" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">2</span>].set_xlabel(<span class="st">"Hour of day (UTC)"</span>)</span>
-<span id="cb2-52"><a href="#cb2-52" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">2</span>].set_ylabel(<span class="st">"Avg vehicles/hour"</span>)</span>
-<span id="cb2-53"><a href="#cb2-53" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">2</span>].set_title(<span class="st">"Daily seasonality pattern (training)"</span>)</span>
-<span id="cb2-54"><a href="#cb2-54" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">2</span>].grid(alpha<span class="op">=</span><span class="fl">0.3</span>, axis<span class="op">=</span><span class="st">"y"</span>)</span>
-<span id="cb2-55"><a href="#cb2-55" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-56"><a href="#cb2-56" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
-<span id="cb2-57"><a href="#cb2-57" aria-hidden="true" tabindex="-1"></a>plt.savefig(</span>
-<span id="cb2-58"><a href="#cb2-58" aria-hidden="true" tabindex="-1"></a>    <span class="st">"data/plots/data_characteristics.png"</span>,</span>
-<span id="cb2-59"><a href="#cb2-59" aria-hidden="true" tabindex="-1"></a>    dpi<span class="op">=</span><span class="dv">200</span>, bbox_inches<span class="op">=</span><span class="st">"tight"</span></span>
-<span id="cb2-60"><a href="#cb2-60" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb2-61"><a href="#cb2-61" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<div class="cell-output cell-output-display">
-<div id="data-stats" class="quarto-figure quarto-figure-center anchored">
+<div class="cell">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="paper_files/figure-html/data-stats-output-1.png" width="952" height="758" class="figure-img"></p>
+<p><img src="paper_files/figure-html/data-stats-1.png" class="img-fluid figure-img" width="672"></p>
 <figcaption>Traffic volume distribution and seasonal patterns</figcaption>
 </figure>
 </div>
@@ -329,6 +289,23 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <section id="seasonal-naive" class="level3" data-number="3.2.3">
 <h3 data-number="3.2.3" class="anchored" data-anchor-id="seasonal-naive"><span class="header-section-number">3.2.3</span> Seasonal Naive</h3>
 <p>The strongest baseline for seasonal data: forecasts each point as the value from the same hour 24 hours prior. Any model worse than naive fails to capture basic seasonality.</p>
+</section>
+<section id="r-implementation-example" class="level3" data-number="3.2.4">
+<h3 data-number="3.2.4" class="anchored" data-anchor-id="r-implementation-example"><span class="header-section-number">3.2.4</span> R Implementation Example</h3>
+<p>To demonstrate how the classical models are fitted and forecasted in R, the following code block illustrates the setup and model fitting of MSTL+ARIMA (as implemented in <code>forecast_r.R</code>):</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(forecast)</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Define the multi-seasonal time series (daily and weekly seasonality)</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>ts_multi <span class="ot">&lt;-</span> <span class="fu">msts</span>(context_data, <span class="at">seasonal.periods =</span> <span class="fu">c</span>(<span class="dv">24</span>, <span class="dv">168</span>))</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="co"># Fit the MSTL + ARIMA model</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>fit_mstl <span class="ot">&lt;-</span> <span class="fu">stlm</span>(ts_multi, <span class="at">method =</span> <span class="st">"arima"</span>, <span class="at">approximation =</span> <span class="cn">TRUE</span>, <span class="at">stepwise =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="co"># Generate a 168-hour forecast</span></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>fc_mstl <span class="ot">&lt;-</span> <span class="fu">forecast</span>(fit_mstl, <span class="at">h =</span> <span class="dv">168</span>)</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>forecasted_values <span class="ot">&lt;-</span> <span class="fu">as.numeric</span>(fc_mstl<span class="sc">$</span>mean)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
 </section>
 </section>
 <section id="toto-2.0-2.5b" class="level2" data-number="3.3">
@@ -387,28 +364,98 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <h1 data-number="4"><span class="header-section-number">4</span> Results</h1>
 <section id="hourly-forecast-performance" class="level2" data-number="4.1">
 <h2 data-number="4.1" class="anchored" data-anchor-id="hourly-forecast-performance"><span class="header-section-number">4.1</span> Hourly Forecast Performance</h2>
-<div id="hourly-table" class="cell" data-execution_count="4">
-<div class="cell-output cell-output-stdout">
-<pre><code>| Model          |   MAE |   RMSE |   MAPE% |   sMAPE% |
-|:---------------|------:|-------:|--------:|---------:|
-| SARIMA         | 104.7 |  192.6 |    39.5 |     41.8 |
-| MSTL+ARIMA     |  57.4 |   89.8 |    33.9 |     28.1 |
-| Seasonal Naive |  74.2 |  117.9 |    32.4 |     26.2 |
-| Toto-2.5B      |  46.5 |   94.8 |    19.5 |     16.9 |</code></pre>
+<div class="cell">
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<thead>
+<tr class="header">
+<th style="text-align: left;">Model</th>
+<th style="text-align: left;">MAE</th>
+<th style="text-align: left;">RMSE</th>
+<th style="text-align: left;">MAPE%</th>
+<th style="text-align: left;">sMAPE%</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">SARIMA</td>
+<td style="text-align: left;">104.7</td>
+<td style="text-align: left;">192.6</td>
+<td style="text-align: left;">39.5</td>
+<td style="text-align: left;">41.8</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">MSTL+ARIMA</td>
+<td style="text-align: left;">57.4</td>
+<td style="text-align: left;">89.8</td>
+<td style="text-align: left;">33.9</td>
+<td style="text-align: left;">28.1</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Seasonal Naive</td>
+<td style="text-align: left;">74.2</td>
+<td style="text-align: left;">117.9</td>
+<td style="text-align: left;">32.4</td>
+<td style="text-align: left;">26.2</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Toto-2.5B</td>
+<td style="text-align: left;">46.5</td>
+<td style="text-align: left;">94.8</td>
+<td style="text-align: left;">19.5</td>
+<td style="text-align: left;">16.9</td>
+</tr>
+</tbody>
+</table>
 </div>
 </div>
 <p><strong>Key finding</strong>: Toto-2.5B achieves the lowest MAE (46.5), outperforming MSTL+ARIMA (57.4) by 19.0% and SARIMA (104.7) by 55.6%. The margin on MAPE is even larger: 19.5% vs 33.9% (MSTL+ARIMA) and 39.5% (SARIMA).</p>
 </section>
 <section id="daily-forecast-performance" class="level2" data-number="4.2">
 <h2 data-number="4.2" class="anchored" data-anchor-id="daily-forecast-performance"><span class="header-section-number">4.2</span> Daily Forecast Performance</h2>
-<div id="daily-table" class="cell" data-execution_count="5">
-<div class="cell-output cell-output-stdout">
-<pre><code>| Model          |    MAE |   RMSE |   MAPE% |   sMAPE% |
-|:---------------|-------:|-------:|--------:|---------:|
-| SARIMA         | 2839.4 | 3259.6 |    36.6 |     27.8 |
-| MSTL+ARIMA     | 2577.8 | 2979.2 |    32.4 |     25.4 |
-| Seasonal Naive | 3154.6 | 4269.7 |    32.7 |     31.8 |
-| Toto-2.5B      |  859   | 1701   |    10.6 |      9.7 |</code></pre>
+<div class="cell">
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<thead>
+<tr class="header">
+<th style="text-align: left;">Model</th>
+<th style="text-align: left;">MAE</th>
+<th style="text-align: left;">RMSE</th>
+<th style="text-align: left;">MAPE%</th>
+<th style="text-align: left;">sMAPE%</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">SARIMA</td>
+<td style="text-align: left;">2839.4</td>
+<td style="text-align: left;">3259.6</td>
+<td style="text-align: left;">36.6</td>
+<td style="text-align: left;">27.8</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">MSTL+ARIMA</td>
+<td style="text-align: left;">2577.8</td>
+<td style="text-align: left;">2979.2</td>
+<td style="text-align: left;">32.4</td>
+<td style="text-align: left;">25.4</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Seasonal Naive</td>
+<td style="text-align: left;">3154.6</td>
+<td style="text-align: left;">4269.7</td>
+<td style="text-align: left;">32.7</td>
+<td style="text-align: left;">31.8</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Toto-2.5B</td>
+<td style="text-align: left;">859.1</td>
+<td style="text-align: left;">1700.8</td>
+<td style="text-align: left;">10.6</td>
+<td style="text-align: left;">9.7</td>
+</tr>
+</tbody>
+</table>
 </div>
 </div>
 <p>The daily margin is decisive: Toto’s MAE of 859 vehicles/day is <strong>66.7% lower</strong> than MSTL+ARIMA (2,578) and <strong>69.8% lower</strong> than SARIMA (2,839). This large gap reflects error accumulation in classical methods when summing 24 hourly forecasts, combined with Toto’s ability to capture full-year seasonal patterns with 8,704 hours of context.</p>
@@ -431,11 +478,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <section id="per-window-stability" class="level2" data-number="4.4">
 <h2 data-number="4.4" class="anchored" data-anchor-id="per-window-stability"><span class="header-section-number">4.4</span> Per-Window Stability</h2>
 <p>Toto’s per-window MAPE averaged 22.9% across 158 rolling windows, consistent with the aggregate MAPE (19.5%). This stability confirms the model does not rely on favorable test periods. Window 152 (MAPE=100.9%) corresponds to a traffic anomaly on June 2-8, 2026, demonstrating that even foundation models struggle with unprecedented events. The full-year context improved per-window MAPE from 23.2% (320h context) to 22.9% (8,704h context), confirming that seasonal patterns spanning months are critical for accurate forecasting.</p>
-<div id="cell-window-analysis" class="cell" data-execution_count="6">
-<div class="cell-output cell-output-display">
-<div id="window-analysis" class="quarto-figure quarto-figure-center anchored">
+<div class="cell">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="paper_files/figure-html/window-analysis-output-1.png" width="1143" height="374" class="figure-img"></p>
+<p><img src="paper_files/figure-html/window-analysis-1.png" class="img-fluid figure-img" width="672"></p>
 <figcaption>Toto per-window MAPE across 158 rolling windows</figcaption>
 </figure>
 </div>

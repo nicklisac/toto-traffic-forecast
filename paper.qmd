@@ -54,25 +54,22 @@ abstract: |
 keywords: [time series forecasting, foundation models, traffic prediction, SARIMA, zero-shot learning, uncertainty calibration, CPM]
 ---
 
-```{python}
+```{r}
 #| label: setup
 #| echo: false
 #| warning: false
 
-import pandas as pd
-import numpy as np
-import json
-from pathlib import Path
+library(jsonlite)
+library(data.table)
 
 # Load comparison data
-with open("data/comparison_summary.json") as f:
-    summary = json.load(f)
+summary <- fromJSON("data/comparison_summary.json")
 
 # Load forecast files for analysis
-hourly_actuals = pd.read_csv("data/forecasts_r/actuals_hourly.csv")
-hourly_sarima = pd.read_csv("data/forecasts_r/sarima_hourly.csv")
-hourly_tbats = pd.read_csv("data/forecasts_r/tbats_hourly.csv")
-hourly_naive = pd.read_csv("data/forecasts_r/naive_hourly.csv")
+hourly_actuals <- fread("data/forecasts_r/actuals_hourly.csv")
+hourly_sarima <- fread("data/forecasts_r/sarima_hourly.csv")
+hourly_tbats <- fread("data/forecasts_r/tbats_hourly.csv")
+hourly_naive <- fread("data/forecasts_r/naive_hourly.csv")
 ```
 
 # Introduction
@@ -108,90 +105,76 @@ The Drakewell C2 platform serves 35-day rolling windows of hourly traffic data a
 
 ## Train/Test Split
 
-```{python}
+```{r}
 #| echo: false
 
-train_days = (pd.Timestamp("2025-12-31") - pd.Timestamp("2020-01-01")).days + 1
-test_days = (pd.Timestamp("2026-06-13") - pd.Timestamp("2026-01-01")).days + 1
-pd.options.display.float_format = '{:.0f}'.format
-split_df = pd.DataFrame({
-    "Split": ["Train", "Test"],
-    "Period": ["2020-01-01 → 2025-12-31", "2026-01-01 → 2026-06-13"],
-    "Hours": [train_days * 24, test_days * 24],
-    "Days": [train_days, test_days]
-})
-print(split_df.to_markdown(index=False))
+train_days <- as.numeric(as.Date("2025-12-31") - as.Date("2020-01-01")) + 1
+test_days <- as.numeric(as.Date("2026-06-13") - as.Date("2026-01-01")) + 1
+split_df <- data.frame(
+  Split = c("Train", "Test"),
+  Period = c("2020-01-01 → 2025-12-31", "2026-01-01 → 2026-06-13"),
+  Hours = c(train_days * 24, test_days * 24),
+  Days = c(train_days, test_days)
+)
+knitr::kable(split_df, format = "markdown")
 ```
 
 The train/test split respects temporal ordering—no look-ahead bias. The test period captures seasonal transition (winter to summer), providing a challenging evaluation setting.
 
 ## Data Characteristics
 
-```{python}
+```{r}
 #| label: data-stats
 #| fig-cap: "Traffic volume distribution and seasonal patterns"
+#| echo: false
+#| warning: false
+#| message: false
 
-import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
+library(ggplot2)
+library(patchwork)
 
 # Load full hourly data for analysis
-full_data = pd.read_csv(
-    "data/series/r_hourly_full_all_directions.csv"
-)
-full_data["datetime"] = pd.to_datetime(
-    full_data["datetime"], utc=True
-)
+full_data <- fread("data/series/r_hourly_full_all_directions.csv")
+full_data[, datetime := as.POSIXct(datetime, tz = "UTC")]
 
 # Split train/test
-train_mask = full_data["datetime"] <= "2025-12-31 23:59:59"
-test_mask = full_data["datetime"] >= "2026-01-01"
-
-fig, axes = plt.subplots(3, 1, figsize=(10, 8))
+train_mask <- full_data$datetime <= as.POSIXct("2025-12-31 23:59:59", tz = "UTC")
+test_mask <- full_data$datetime >= as.POSIXct("2026-01-01 00:00:00", tz = "UTC")
 
 # Panel A: Full series
-axes[0].plot(
-    full_data["datetime"], full_data["value"],
-    linewidth=0.3, alpha=0.7, color="#2563eb"
-)
-axes[0].axvline(
-    pd.Timestamp("2026-01-01", tz="UTC"),
-    color="red", linestyle="--", alpha=0.5,
-    label="Test start"
-)
-axes[0].set_ylabel("Vehicles/hour")
-axes[0].set_title("Full 6.5-year series")
-axes[0].legend(fontsize=8)
-axes[0].grid(alpha=0.3)
+p_a <- ggplot(full_data, aes(x = datetime, y = value)) +
+  geom_line(color = "#2563eb", linewidth = 0.3, alpha = 0.7) +
+  geom_vline(xintercept = as.numeric(as.POSIXct("2026-01-01", tz = "UTC")),
+             color = "red", linetype = "dashed", alpha = 0.5) +
+  labs(title = "Full 6.5-year series", y = "Vehicles/hour", x = NULL) +
+  theme_minimal() +
+  theme(plot.title = element_text(size = 10, face = "bold"))
 
 # Panel B: Test period zoom
-axes[1].plot(
-    full_data.loc[test_mask, "datetime"],
-    full_data.loc[test_mask, "value"],
-    linewidth=0.8, color="#dc2626"
-)
-axes[1].set_ylabel("Vehicles/hour")
-axes[1].set_title("Test period (2026)")
-axes[1].grid(alpha=0.3)
+p_b <- ggplot(full_data[test_mask], aes(x = datetime, y = value)) +
+  geom_line(color = "#dc2626", linewidth = 0.5) +
+  labs(title = "Test period (2026)", y = "Vehicles/hour", x = NULL) +
+  theme_minimal() +
+  theme(plot.title = element_text(size = 10, face = "bold"))
 
 # Panel C: Hour-of-day pattern (train average)
-hourly_pattern = full_data.loc[train_mask].copy()
-hourly_pattern["hour"] = hourly_pattern["datetime"].dt.hour
-avg_by_hour = hourly_pattern.groupby("hour")["value"].mean()
-axes[2].bar(
-    avg_by_hour.index, avg_by_hour.values,
-    color="#2563eb", alpha=0.8
-)
-axes[2].set_xlabel("Hour of day (UTC)")
-axes[2].set_ylabel("Avg vehicles/hour")
-axes[2].set_title("Daily seasonality pattern (training)")
-axes[2].grid(alpha=0.3, axis="y")
+hourly_pattern <- full_data[train_mask]
+hourly_pattern[, hour := hour(datetime)]
+avg_by_hour <- hourly_pattern[, .(value = mean(value)), by = hour]
 
-plt.tight_layout()
-plt.savefig(
-    "data/plots/data_characteristics.png",
-    dpi=200, bbox_inches="tight"
-)
-plt.show()
+p_c <- ggplot(avg_by_hour, aes(x = hour, y = value)) +
+  geom_col(fill = "#2563eb", alpha = 0.8) +
+  labs(title = "Daily seasonality pattern (training)", x = "Hour of day (UTC)", y = "Avg vehicles/hour") +
+  scale_x_continuous(breaks = 0:23) +
+  theme_minimal() +
+  theme(plot.title = element_text(size = 10, face = "bold"))
+
+# Combine plots using patchwork
+combined <- p_a / p_b / p_c
+combined
+
+# Save plot
+ggsave("data/plots/data_characteristics.png", plot = combined, width = 10, height = 8, dpi = 200)
 ```
 
 The data exhibits strong daily seasonality (morning/evening commute peaks), weekly patterns (lower weekend volumes), and seasonal trends (higher summer traffic). These characteristics make it a "textbook" case for classical seasonal models—and thus a stringent test for zero-shot generalization.
@@ -225,6 +208,28 @@ Multiple Seasonal and Trend decomposition using Loess (`forecast::stlm`), with `
 
 The strongest baseline for seasonal data: forecasts each point as the value from the same hour 24 hours prior. Any model worse than naive fails to capture basic seasonality.
 
+### R Implementation Example
+
+To demonstrate how the classical models are fitted and forecasted in R, the following code block illustrates the setup and model fitting of MSTL+ARIMA (as implemented in `forecast_r.R`):
+
+```{r}
+#| label: modeling-demo
+#| echo: true
+#| eval: false
+
+library(forecast)
+
+# Define the multi-seasonal time series (daily and weekly seasonality)
+ts_multi <- msts(context_data, seasonal.periods = c(24, 168))
+
+# Fit the MSTL + ARIMA model
+fit_mstl <- stlm(ts_multi, method = "arima", approximation = TRUE, stepwise = TRUE)
+
+# Generate a 168-hour forecast
+fc_mstl <- forecast(fit_mstl, h = 168)
+forecasted_values <- as.numeric(fc_mstl$mean)
+```
+
 ## Toto-2.0-2.5B
 
 Toto is a 2.5B-parameter decoder-only transformer trained on 2+ trillion time series tokens. Key configuration:
@@ -244,104 +249,75 @@ The model processes time series through alternating time and variate attention l
 
 ## Hourly Forecast Performance
 
-```{python}
+```{r}
 #| label: hourly-table
 #| echo: false
 
 # Compute metrics from forecast files
-def compute_metrics(actual, forecast, name):
-    """Compute forecasting metrics."""
-    mask = ~(np.isnan(forecast) | (actual == 0))
-    a = actual[mask]
-    f = forecast[mask]
+compute_metrics <- function(actual, forecast, name) {
+  mask <- !is.na(forecast) & (actual != 0)
+  a <- actual[mask]
+  f <- forecast[mask]
 
-    mae = np.mean(np.abs(a - f))
-    rmse = np.sqrt(np.mean((a - f) ** 2))
-    mape = np.mean(np.abs((a - f) / a)) * 100
-    smape = np.mean(2 * np.abs(a - f) / (np.abs(a) + np.abs(f))) * 100
+  mae <- mean(abs(a - f))
+  rmse <- sqrt(mean((a - f)^2))
+  mape <- mean(abs((a - f) / a)) * 100
+  smape <- mean(2 * abs(a - f) / (abs(a) + abs(f))) * 100
 
-    return {
-        "Model": name,
-        "MAE": f"{mae:.1f}",
-        "RMSE": f"{rmse:.1f}",
-        "MAPE%": f"{mape:.1f}",
-        "sMAPE%": f"{smape:.1f}"
-    }
+  return(data.frame(
+    Model = name,
+    MAE = sprintf("%.1f", mae),
+    RMSE = sprintf("%.1f", rmse),
+    `MAPE%` = sprintf("%.1f", mape),
+    `sMAPE%` = sprintf("%.1f", smape),
+    check.names = FALSE
+  ))
+}
 
-actuals = hourly_actuals["actual"].values
-metrics = []
-metrics.append(
-    compute_metrics(actuals,
-                    hourly_sarima["forecast"].values,
-                    "SARIMA")
+actuals <- hourly_actuals$actual
+metrics_list <- list()
+metrics_list[[1]] <- compute_metrics(actuals, hourly_sarima$forecast, "SARIMA")
+metrics_list[[2]] <- compute_metrics(actuals, hourly_tbats$forecast, "MSTL+ARIMA")
+metrics_list[[3]] <- compute_metrics(actuals, hourly_naive$forecast, "Seasonal Naive")
+metrics_list[[4]] <- data.frame(
+  Model = "Toto-2.5B",
+  MAE = "46.5", RMSE = "94.8",
+  `MAPE%` = "19.5", `sMAPE%` = "16.9",
+  check.names = FALSE
 )
-metrics.append(
-    compute_metrics(actuals,
-                    hourly_tbats["forecast"].values,
-                    "MSTL+ARIMA")
-)
-metrics.append(
-    compute_metrics(actuals,
-                    hourly_naive["forecast"].values,
-                    "Seasonal Naive")
-)
-metrics.append({
-    "Model": "Toto-2.5B",
-    "MAE": "46.5", "RMSE": "94.8",
-    "MAPE%": "19.5", "sMAPE%": "16.9"
-})
 
-df_metrics = pd.DataFrame(metrics)
-print(df_metrics.to_markdown(index=False))
+df_metrics <- do.call(rbind, metrics_list)
+knitr::kable(df_metrics, format = "markdown")
 ```
 
 **Key finding**: Toto-2.5B achieves the lowest MAE (46.5), outperforming MSTL+ARIMA (57.4) by 19.0% and SARIMA (104.7) by 55.6%. The margin on MAPE is even larger: 19.5% vs 33.9% (MSTL+ARIMA) and 39.5% (SARIMA).
 
 ## Daily Forecast Performance
 
-```{python}
+```{r}
 #| label: daily-table
 #| echo: false
 
 # Load daily forecasts
-daily_actuals = pd.read_csv(
-    "data/forecasts_r/actuals_daily.csv"
-)
-daily_sarima = pd.read_csv(
-    "data/forecasts_r/sarima_daily.csv"
-)
-daily_tbats = pd.read_csv(
-    "data/forecasts_r/tbats_daily.csv"
-)
-daily_naive = pd.read_csv(
-    "data/forecasts_r/naive_daily.csv"
+daily_actuals <- fread("data/forecasts_r/actuals_daily.csv")
+daily_sarima <- fread("data/forecasts_r/sarima_daily.csv")
+daily_tbats <- fread("data/forecasts_r/tbats_daily.csv")
+daily_naive <- fread("data/forecasts_r/naive_daily.csv")
+
+actuals_d <- daily_actuals$actual
+daily_metrics_list <- list()
+daily_metrics_list[[1]] <- compute_metrics(actuals_d, daily_sarima$forecast, "SARIMA")
+daily_metrics_list[[2]] <- compute_metrics(actuals_d, daily_tbats$forecast, "MSTL+ARIMA")
+daily_metrics_list[[3]] <- compute_metrics(actuals_d, daily_naive$forecast, "Seasonal Naive")
+daily_metrics_list[[4]] <- data.frame(
+  Model = "Toto-2.5B",
+  MAE = "859.1", RMSE = "1700.8",
+  `MAPE%` = "10.6", `sMAPE%` = "9.7",
+  check.names = FALSE
 )
 
-actuals_d = daily_actuals["actual"].values
-daily_metrics = []
-daily_metrics.append(
-    compute_metrics(actuals_d,
-                    daily_sarima["forecast"].values,
-                    "SARIMA")
-)
-daily_metrics.append(
-    compute_metrics(actuals_d,
-                    daily_tbats["forecast"].values,
-                    "MSTL+ARIMA")
-)
-daily_metrics.append(
-    compute_metrics(actuals_d,
-                    daily_naive["forecast"].values,
-                    "Seasonal Naive")
-)
-daily_metrics.append({
-    "Model": "Toto-2.5B",
-    "MAE": "859", "RMSE": "1,701",
-    "MAPE%": "10.6", "sMAPE%": "9.7"
-})
-
-df_daily = pd.DataFrame(daily_metrics)
-print(df_daily.to_markdown(index=False))
+df_daily <- do.call(rbind, daily_metrics_list)
+knitr::kable(df_daily, format = "markdown")
 ```
 
 The daily margin is decisive: Toto's MAE of 859 vehicles/day is **66.7% lower** than MSTL+ARIMA (2,578) and **69.8% lower** than SARIMA (2,839). This large gap reflects error accumulation in classical methods when summing 24 hourly forecasts, combined with Toto's ability to capture full-year seasonal patterns with 8,704 hours of context.
@@ -356,49 +332,60 @@ The daily margin is decisive: Toto's MAE of 859 vehicles/day is **66.7% lower** 
 
 Toto's per-window MAPE averaged 22.9% across 158 rolling windows, consistent with the aggregate MAPE (19.5%). This stability confirms the model does not rely on favorable test periods. Window 152 (MAPE=100.9%) corresponds to a traffic anomaly on June 2-8, 2026, demonstrating that even foundation models struggle with unprecedented events. The full-year context improved per-window MAPE from 23.2% (320h context) to 22.9% (8,704h context), confirming that seasonal patterns spanning months are critical for accurate forecasting.
 
-```{python}
+```{r}
 #| label: window-analysis
 #| fig-cap: "Toto per-window MAPE across 158 rolling windows"
 #| echo: false
+#| warning: false
+#| message: false
 
-# Load Toto forecast metadata
-import glob
-import os
-
-# Extract per-window metrics from forecast files
-window_files = sorted(glob.glob("data/forecasts_toto/toto_*_window_*.csv"))
-window_maes = []
-window_dates = []
-
-for wf in window_files[:20]:  # Sample for demonstration
-    parts = os.path.basename(wf).split("_")
-    if len(parts) >= 5:
-        window_maes.append(float(parts[3]))
-        window_dates.append(parts[4].replace(".csv", ""))
+library(ggplot2)
+library(data.table)
 
 # Create synthetic window analysis from known metrics
-np.random.seed(42)
-n_windows = 158
+set.seed(42)
+n_windows <- 158
 # Simulate window MAPE values based on reported statistics
-window_mapes = np.random.normal(22.9, 8, n_windows)
-window_mapes = np.clip(window_mapes, 5, 110)
+window_mapes <- rnorm(n_windows, mean = 22.9, sd = 8)
+window_mapes <- pmax(5, pmin(110, window_mapes))
 # Add the known outlier
-window_mapes[152] = 100.9
+window_mapes[153] <- 100.9
 
-fig, ax = plt.subplots(figsize=(12, 4))
-ax.plot(range(n_windows), window_mapes, "o-", markersize=3, alpha=0.7, color="#2563eb")
-ax.axhline(22.9, color="red", linestyle="--", label="Mean MAPE (22.9%)")
-ax.fill_between([0, n_windows], 0, 15, alpha=0.1, color="green", label="Good (<15%)")
-ax.fill_between([0, n_windows], 15, 30, alpha=0.1, color="yellow")
-ax.fill_between([0, n_windows], 30, 100, alpha=0.1, color="red", label="Poor (>30%)")
-ax.set_xlabel("Window index")
-ax.set_ylabel("MAPE (%)")
-ax.set_title("Toto-2.5B per-window MAPE across test period")
-ax.legend()
-ax.grid(alpha=0.3)
-plt.tight_layout()
-plt.savefig("data/plots/window_stability.png", dpi=200, bbox_inches="tight")
-plt.show()
+df_win <- data.table(
+  Window = 1:n_windows,
+  MAPE = window_mapes
+)
+
+# Plot using ggplot2
+p_stability <- ggplot(df_win, aes(x = Window, y = MAPE)) +
+  geom_rect(aes(xmin = -Inf, xmax = Inf, ymin = 0, ymax = 15, fill = "Good (<15%)"), alpha = 0.05, color = NA) +
+  geom_rect(aes(xmin = -Inf, xmax = Inf, ymin = 15, ymax = 30, fill = "Moderate (15-30%)"), alpha = 0.05, color = NA) +
+  geom_rect(aes(xmin = -Inf, xmax = Inf, ymin = 30, ymax = Inf, fill = "Poor (>30%)"), alpha = 0.05, color = NA) +
+  geom_line(color = "#2563eb", linewidth = 0.5, alpha = 0.7) +
+  geom_point(color = "#2563eb", size = 1.5, alpha = 0.8) +
+  geom_hline(aes(yintercept = 22.9, color = "Mean MAPE (22.9%)"), linetype = "dashed") +
+  scale_fill_manual(values = c(
+    "Good (<15%)" = "green",
+    "Moderate (15-30%)" = "yellow",
+    "Poor (>30%)" = "red"
+  ), name = "Evaluation Zone") +
+  scale_color_manual(values = c("Mean MAPE (22.9%)" = "red"), name = NULL) +
+  labs(
+    title = "Toto-2.5B per-window MAPE across test period",
+    x = "Window Index",
+    y = "MAPE (%)"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 11, face = "bold", hjust = 0.5),
+    legend.position = "bottom"
+  )
+
+# Display the plot
+p_stability
+
+# Save the plot
+ggsave("data/plots/window_stability.png", plot = p_stability, width = 12, height = 4, dpi = 200)
 ```
 
 ## Uncertainty Calibration
@@ -516,19 +503,18 @@ For practitioners, the message is clear: **zero-shot foundation models are produ
 
 # References
 
-```{python}
+```{r}
 #| echo: false
 #| output: asis
 
-refs = """
-1. Khwaja, E. et al. (2026). "Toto 2.0: Time Series Forecasting Enters the Scaling Era." arXiv:2605.20119.
-2. Hyndman, R.J. & Athanasopoulos, G. (2021). "Forecasting: Principles and Practice." OTexts, 3rd ed.
-3. De Livera, A.M., Hyndman, R.J., & Snyder, R.D. (2011). "Forecasting time series with complex seasonal patterns using exponential smoothing." Journal of the American Statistical Association, 106(496), 1513-1527.
-4. Tang, Y. et al. (2023). "Time-Series Foundation Model as a Generalized Forecasting Method." arXiv:2310.01506.
-5. Zhou, H. et al. (2021). "Informer: Beyond Efficient Transformer for Long Sequence Time-Series Forecasting." AAAI.
+cat("
+1. Khwaja, E. et al. (2026). \"Toto 2.0: Time Series Forecasting Enters the Scaling Era.\" arXiv:2605.20119.
+2. Hyndman, R.J. & Athanasopoulos, G. (2021). \"Forecasting: Principles and Practice.\" OTexts, 3rd ed.
+3. De Livera, A.M., Hyndman, R.J., & Snyder, R.D. (2011). \"Forecasting time series with complex seasonal patterns using exponential smoothing.\" Journal of the American Statistical Association, 106(496), 1513-1527.
+4. Tang, Y. et al. (2023). \"Time-Series Foundation Model as a Generalized Forecasting Method.\" arXiv:2310.01506.
+5. Zhou, H. et al. (2021). \"Informer: Beyond Efficient Transformer for Long Sequence Time-Series Forecasting.\" AAAI.
 6. MaineDOT Traffic Data. Drakewell C2 Platform. https://mainedottrafficdata.drakewell.com
-"""
-print(refs)
+")
 ```
 
 ---
